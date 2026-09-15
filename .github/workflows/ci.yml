@@ -1,0 +1,141 @@
+name: Android CI
+
+# 15.09.2026 — odpowiednik `PMemories-iOS`'s `ci.yml` od pierwszego dnia
+# (nie budowany etapami jak na iOS, bo cały kształt jest już znany i
+# sprawdzony na żywo tam). Ten sam bot Telegram ("PMemories CI") i ten sam
+# listener na VPS obsługują TERAZ oba repo — patrz `/scan android`/
+# `/scan ios` w komendach bota (`telegram-bot/listener.py`, PMemories-iOS).
+#
+# Ubuntu (nie macOS jak iOS) — Android nie wymaga Xcode/symulatora,
+# GitHub-hostowane runnery `ubuntu-latest` mają Android SDK preinstalowany.
+#
+# Świadomie NIE robi (jeszcze): podpisywania/uploadu na Play Console —
+# appka nie jest jeszcze tam wystawiona (Etap 6 w `Docs/Android.md`,
+# zablokowany na realnym projekcie Firebase).
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  # 11:00 UTC = 12:00 UK latem (BST) — ten sam offset co iOS, ta sama
+  # przyszła korekta ręczna po przejściu na czas zimowy (GMT).
+  schedule:
+    - cron: '0 11 * * *'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # Diagnostyczne — ten sam duch co "List available Xcode versions" na
+      # iOS, żeby pierwszy realny fail od razu pokazał co runner ma
+      # zainstalowane, zamiast zgadywać.
+      - name: Show environment
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          java -version
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # `set -o pipefail` — ten sam powód co przy `xcodebuild | tee` na iOS:
+      # bez tego `| tee` maskuje kod wyjścia Gradle'a.
+      - name: Build (assembleDebug)
+        run: |
+          set -o pipefail
+          ./gradlew assembleDebug --console=plain 2>&1 | tee build.log
+
+      - name: Unit tests
+        run: |
+          set -o pipefail
+          ./gradlew testDebugUnitTest --console=plain 2>&1 | tee test.log
+
+      # 15.09.2026 — ten sam mechanizm co iOS (patrz `PMemories-iOS/ci.yml`,
+      # komentarz przy "Explain errors in plain language" — wieloliniowy
+      # prompt PRZEZ `printf %s\n\n%s` na jednej linii, nie wprost w `run: |`,
+      # żeby nie łamać wcięcia YAML).
+      - name: Explain errors in plain language
+        if: failure()
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          CI_LANG: ${{ vars.CI_LANG || 'pl' }}
+        run: |
+          ERRORS=$(grep -hE "error:|FAILED|Exception" build.log test.log 2>/dev/null | head -20)
+          if [ -z "$ERRORS" ]; then
+            if [ "$CI_LANG" = "en" ]; then
+              echo "(no clear build errors in the log — see the full log via the link below)" > explanation.txt
+            else
+              echo "(brak jasnych błędów builda w logu — zobacz pełny log pod linkiem)" > explanation.txt
+            fi
+          else
+            npm install -g @anthropic-ai/claude-code >/dev/null 2>&1
+            if [ "$CI_LANG" = "en" ]; then
+              PROMPT=$(printf 'Explain IN ENGLISH, in plain language, with no programming jargon, what went wrong in this Android app (Kotlin/Jetpack Compose) based on the Gradle build/test errors below. Max 3-4 sentences. Explain the CAUSE, do not propose a fix (that is a separate step). Errors:\n\n%s' "$ERRORS")
+            else
+              PROMPT=$(printf 'Wytłumacz PO POLSKU, prostym językiem, bez żargonu programistycznego, co poszło nie tak w tej aplikacji Android (Kotlin/Jetpack Compose) na podstawie poniższych błędów Gradle. Maksymalnie 3-4 zdania. Wytłumacz PRZYCZYNĘ, nie proponuj poprawki (to osobny krok). Błędy:\n\n%s' "$ERRORS")
+            fi
+            claude -p "$PROMPT" --max-turns 1 > explanation.txt 2>/dev/null
+            if [ ! -s explanation.txt ]; then
+              if [ "$CI_LANG" = "en" ]; then
+                echo "(couldn't generate an explanation — see the raw errors via the link below)" > explanation.txt
+              else
+                echo "(nie udało się wygenerować wyjaśnienia — zobacz surowe błędy pod linkiem)" > explanation.txt
+              fi
+            fi
+          fi
+
+      - name: Notify Telegram on failure
+        if: failure()
+        env:
+          RAW_COMMIT_MSG: ${{ github.event.head_commit.message || github.event.pull_request.title || 'Codzienne sprawdzenie (harmonogram)' }}
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          CI_LANG: ${{ vars.CI_LANG || 'pl' }}
+        run: |
+          EXPLANATION=$(cat explanation.txt 2>/dev/null || echo "(zobacz pełny log pod linkiem niżej)")
+          COMMIT_MSG=$(echo "$RAW_COMMIT_MSG" | head -1)
+          if [ "$CI_LANG" = "en" ]; then
+            MESSAGE=$(printf '❌ PMemories Android CI FAILED\nBranch: %s\nCommit: %s\n\n%s\n\n%s' "$BRANCH" "$COMMIT_MSG" "$EXPLANATION" "$RUN_URL")
+            BUTTON_TEXT="🔧 Fix"
+          else
+            MESSAGE=$(printf '❌ PMemories Android CI FAILED\nGałąź: %s\nCommit: %s\n\n%s\n\n%s' "$BRANCH" "$COMMIT_MSG" "$EXPLANATION" "$RUN_URL")
+            BUTTON_TEXT="🔧 Napraw"
+          fi
+          # `callback_data` niesie "android:<run_id>" (nie samo "fix:<run_id>"
+          # jak na iOS) — listener na VPS obsługuje TERAZ oba repo, prefiks
+          # mówi mu który `auto-fix.yml` odpalić (`PMemories-iOS` vs
+          # `PMemories-Android`).
+          KEYBOARD="{\"inline_keyboard\":[[{\"text\":\"${BUTTON_TEXT}\",\"callback_data\":\"fix:android:${{ github.run_id }}\"}]]}"
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            --data-urlencode "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+            --data-urlencode "text=${MESSAGE}" \
+            --data-urlencode "reply_markup=${KEYBOARD}" > /dev/null
+
+      - name: Notify Telegram on success
+        if: success()
+        env:
+          RAW_COMMIT_MSG: ${{ github.event.head_commit.message || github.event.pull_request.title || 'Codzienne sprawdzenie (harmonogram)' }}
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+          CI_LANG: ${{ vars.CI_LANG || 'pl' }}
+        run: |
+          COMMIT_MSG=$(echo "$RAW_COMMIT_MSG" | head -1)
+          if [ "$CI_LANG" = "en" ]; then
+            MESSAGE=$(printf '✅ PMemories Android CI passed\nBranch: %s\nCommit: %s' "$BRANCH" "$COMMIT_MSG")
+          else
+            MESSAGE=$(printf '✅ PMemories Android CI passed\nGałąź: %s\nCommit: %s' "$BRANCH" "$COMMIT_MSG")
+          fi
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            --data-urlencode "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+            --data-urlencode "text=${MESSAGE}" > /dev/null
