@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -5,6 +7,20 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.google.services)
 }
+
+// 15.09.2026, Etap 7 — Google Maps needs its own API key, a SEPARATE
+// blocker from Firebase's `google-services.json` (same class of problem:
+// requires the user to create it in a browser — Google Cloud Console,
+// "Maps SDK for Android" enabled — then paste it here). Read from
+// `local.properties` (already gitignored, never committed) rather than
+// hardcoding, same spirit as `sdk.dir` in that file. Empty string when
+// absent — the app still builds and runs, the map screens just show blank
+// map tiles until a real key is dropped in.
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+val mapsApiKey: String = localProperties.getProperty("MAPS_API_KEY", "")
 
 android {
     namespace = "com.piotrmarkowski.pmemories"
@@ -16,6 +32,7 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "0.1"
+        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
     }
 
     buildTypes {
@@ -72,4 +89,9 @@ dependencies {
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.googleid)
+
+    // Etap 7 — Travel Map.
+    implementation(libs.androidx.exifinterface)
+    implementation(libs.maps.compose)
+    implementation(libs.play.services.maps)
 }

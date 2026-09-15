@@ -10,9 +10,16 @@ import androidx.room.RoomDatabase
         ProjectEntity::class,
         MediaItemEntity::class,
         CaptionEntity::class,
-        OverlayItemEntity::class
+        OverlayItemEntity::class,
+        TripEntity::class,
+        StopEntity::class
     ],
-    version = 1,
+    // 15.09.2026 — Etap 7: two new entities (TripEntity/StopEntity). No
+    // migration written — pre-release, no real users on any store yet, only
+    // local test/dev installs. `fallbackToDestructiveMigration()` wipes and
+    // recreates on schema mismatch instead of crashing those installs; a
+    // real migration path is needed before this ships to actual testers.
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -20,6 +27,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun mediaItemDao(): MediaItemDao
     abstract fun captionDao(): CaptionDao
     abstract fun overlayItemDao(): OverlayItemDao
+    abstract fun tripDao(): TripDao
 
     companion object {
         @Volatile private var instance: AppDatabase? = null
@@ -30,7 +38,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "pmemories.db"
-                ).build().also { instance = it }
+                ).fallbackToDestructiveMigration().build().also { instance = it }
             }
     }
 }

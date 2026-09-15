@@ -2,6 +2,8 @@ package com.piotrmarkowski.pmemories.ui.home
 
 import android.text.format.DateUtils
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,6 +13,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
@@ -29,6 +33,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.piotrmarkowski.pmemories.auth.AuthManager
 import com.piotrmarkowski.pmemories.data.ProjectWithDetails
+import com.piotrmarkowski.pmemories.data.TripWithStops
+import com.piotrmarkowski.pmemories.travel.TravelViewModel
 import java.util.Calendar
 
 /**
@@ -45,9 +51,15 @@ import java.util.Calendar
  * out entirely for the same reason, unchanged from the original plan.
  */
 @Composable
-fun DashboardScreen(modifier: Modifier = Modifier, viewModel: DashboardViewModel = viewModel()) {
+fun DashboardScreen(
+    modifier: Modifier = Modifier,
+    onOpenTravel: () -> Unit = {},
+    viewModel: DashboardViewModel = viewModel(),
+    travelViewModel: TravelViewModel = viewModel()
+) {
     val continuable by viewModel.continuableProject.collectAsState()
     val displayName by AuthManager.displayName.collectAsState()
+    val travelState by travelViewModel.uiState.collectAsState()
 
     Column(modifier = modifier.fillMaxSize().padding(24.dp)) {
         Text(greeting(displayName), style = MaterialTheme.typography.headlineMedium)
@@ -60,6 +72,55 @@ fun DashboardScreen(modifier: Modifier = Modifier, viewModel: DashboardViewModel
                 style = MaterialTheme.typography.bodyMedium
             )
         }
+
+        Spacer(Modifier.height(24.dp))
+        RecentMemoriesSection(trips = travelState.trips, onOpenTravel = onOpenTravel)
+    }
+}
+
+/**
+ * Etap 7 (15.09.2026) — the Travel-dependent half of Etap 3's original
+ * checklist item, deferred here until real trip data existed (see the
+ * file-level doc above). Android analog of iOS `HomeView.recentMemoriesSection`
+ * — a horizontal strip of recent trips (flag/country implied by title for
+ * now, day-count/stop-count shown), tapping a card or the empty state both
+ * jump to the Travel tab (no per-trip deep link from here yet, unlike iOS's
+ * `RecentMemoryTile` — a reasonable v1 gap, not a design decision).
+ */
+@Composable
+private fun RecentMemoriesSection(trips: List<TripWithStops>, onOpenTravel: () -> Unit) {
+    Text("Recent Memories", style = MaterialTheme.typography.titleMedium)
+    Spacer(Modifier.height(8.dp))
+    if (trips.isEmpty()) {
+        Text(
+            "Start your first trip",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.clickable(onClick = onOpenTravel)
+        )
+        return
+    }
+    Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
+        trips.take(10).forEach { trip ->
+            RecentMemoryTile(trip, onClick = onOpenTravel)
+            Spacer(Modifier.width(12.dp))
+        }
+    }
+}
+
+@Composable
+private fun RecentMemoryTile(trip: TripWithStops, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .width(140.dp)
+            .wrapContentWidth()
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(12.dp)
+    ) {
+        Text(trip.trip.title, style = MaterialTheme.typography.titleSmall, maxLines = 2)
+        Spacer(Modifier.height(4.dp))
+        Text("${trip.stops.size} stops", style = MaterialTheme.typography.labelSmall)
     }
 }
 

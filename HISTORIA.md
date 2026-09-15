@@ -676,3 +676,27 @@ User poszedł spać, autoryzował samodzielną pracę ("ja zrobie wszystko" — 
 **Dopisane do `Android.md`** (zasada na bieżąco): trzy nowe punkty z dzisiejszej sesji iOS do przeniesienia na Androida gdy dojdzie kolej — `AnalyticsLogger` (odpowiednik przez Firebase Analytics), najwyższy szczyt na plakacie (dotyczy Etapu 7), ostateczny podział Free/Premium z `Pricing.md`.
 
 **Stan Etapu 5**: w pełni domknięty (format + podpięcie + PL→EN + plurals). Następny krok w kolejności to Etap 6 (pierwsze wydanie testowe) — zablokowany na tym samym kroku co Etap 4 (user musi ręcznie stworzyć prawdziwy projekt Firebase w przeglądarce i podmienić `google-services.json`).
+
+## 15.09.2026 (ciąg dalszy) — Etap 7: Travel Map zbudowany w całości (user do pracy, "buduj więc całą 7")
+
+User: "buduj wiec cala 7 ja ide do pracy chce miec cala apke juz gotowa a 6 zajmiemy sie po pracy" — największy i najbardziej złożony etap całego projektu, zbudowany solo w jednej sesji. Pełny opis w `Docs/Android.md` (sekcja Etap 7) — tu skrót najważniejszych decyzji i realnych problemów po drodze.
+
+**Architektura (nowe pliki, pakiet `travel/`)**: `TransportMode`, `TravelAchievementsCalculator`/`ExplorerScore` (1:1 port wzoru iOS), `RouteProvider` (Haversine, uproszczone v1 zamiast płatnego Directions API), `ElevationProvider` (open-elevation.com, darmowe), `PeakSearchProvider` (Overpass, to samo źródło co iOS), `CitySearchProvider` (wbudowany `Geocoder`), `PhotoLocationReader`+`SmartRouteDetector` (EXIF przez `androidx.exifinterface`, 1:1 port algorytmu klastrowania iOS), `TravelViewModel`, `BitmapSequenceVideoRenderer`+`RouteFrameRenderer`+`RouteVideoRenderer` (uproszczony animowany eksport). Nowe encje Room: `TripEntity`/`StopEntity`, `AppDatabase` v2.
+
+**UI**: `TravelScreen` (segmented Trips/Globe, karta Explorer Score, lista tras), `TripBuilderScreen` (wyszukiwanie + Smart Route + lista przystanków), `TripDetailScreen` (mapa trasy), `WorldGlobeMap`/`TripRouteMap` (Google Maps Compose), `LeaderboardScreen` (pierwsze realne podpięcie `LeaderboardService` do UI). Nawigacja: 4. zakładka Travel.
+
+**Dwa nowe zewnętrzne blokery znalezione i rozwiązane od razu bez czekania na usera**: Google Maps SDK wymaga własnego, PŁATNEGO klucza Google Cloud (ten sam rodzaj problemu co Firebase) — rozwiązane przez manifest placeholder (`local.properties` → `MAPS_API_KEY`, gitignored, pusty string = appka buduje się i działa, mapy pokazują puste kafelki do czasu wklejenia klucza) zamiast blokować cały etap na tym jednym kroku. Google Directions API (prawdziwe trasowanie) to ten sam rodzaj blokera — obejście: `RouteProvider` liczy dystans i animację po ortodromie (Haversine), jawnie oznaczone jako uproszczone v1 z opisaną ścieżką rozbudowy.
+
+**Realny bug znaleziony i naprawiony NA ŻYWO** (nie w kodzie statycznie, tylko przez faktyczne klikanie na emulatorze): zakładka Travel po wizycie w "Build Route" wracała do TEGO ekranu zamiast do listy tras — standardowy `saveState`/`restoreState` Jetpack Navigation dla dolnej nawigacji, ale sub-ekrany Travel (`travel/builder`, `travel/trip/{id}`) żyją w tym samym płaskim grafie co sama zakładka, nie w osobnym zagnieżdżonym grafie — przez co "zapamiętywały się" razem z nią. Naprawione usunięciem `saveState`/`restoreState` z `navigateToTab` (drobny koszt: Home/Studio/Library tracą pamięć przewijania między zakładkami, akceptowalne na tym etapie). Zweryfikowane przez ponowny build+install+test na żywo — działa poprawnie.
+
+**Świadomie NIE zbudowane — "Travel Replay" (poprawka nieaktualnego zapisu w `Android.md`)**: sprawdzenie iOS przed budową ujawniło, że ta koncepcja (karta outro ze statystykami podróży) została tam CAŁKOWICIE USUNIĘTA 13.08.2026 — user na iOS wprost: appka ma być do dowolnych wspomnień, nie tylko podróży. Budowanie tego na Androidzie odtworzyłoby świadomie odrzuconą na iOS funkcję. Pominięte celowo, `Android.md` poprawiony żeby nie wprowadzać w błąd przy kolejnej sesji.
+
+**Weryfikacja na żywo (nie tylko kompilacja)** — pełny cykl przetestowany na emulatorze (`PMemories_Pixel`) przez ominięcie ekranu logowania (ręczne wstrzyknięcie `SharedPreferences` przez `run-as`, ten sam trik co wcześniej dziś, tym razem skuteczny za drugim podejściem — pierwsza próba użyła kruchego jednolinijkowego `sh -c` przez `adb shell`, druga: `adb push` do `/data/local/tmp` + `run-as cat >` zadziałało niezawodnie):
+1. Dashboard pokazuje zakładkę Travel i sekcję Recent Memories.
+2. Travel → Trips (pusty stan) → Globe (segmented control działa).
+3. FAB "+" → Build Route → wyszukanie "Warsaw" przez prawdziwy `Geocoder` → wynik "Warsaw / Poland" → wybór transportu (✈️) → Stops (1).
+4. Save → zapis do Room, powrót do listy (po naprawie buga nawigacji).
+5. Lista tras pokazuje "Warsaw · 1 stops", Explorer Score **"25 · Newcomer"** — dokładnie zgodne ze wzorem (1×20 + 1×5).
+6. Dashboard → Recent Memories pokazuje tę samą podróż.
+
+**Stan na koniec dnia**: Etap 7 kompletny poza dwoma zewnętrznymi blokerami (Firebase, klucz Maps — oba wymagają przeglądarki usera, do zrobienia po pracy razem z Etapem 6) i kilkoma jawnie oznaczonymi uproszczeniami v1 (routing po linii prostej zamiast prawdziwych tras, Canvas zamiast satelitarnych kafelków w eksporcie wideo, brak zdjęcia reprezentatywnego na kafelku Recent Memories). Appka buduje się, instaluje i działa end-to-end na urządzeniu.
