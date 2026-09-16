@@ -4,6 +4,7 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.piotrmarkowski.pmemories.analytics.AnalyticsLogger
 import com.piotrmarkowski.pmemories.data.AppDatabase
 import com.piotrmarkowski.pmemories.data.StopEntity
 import com.piotrmarkowski.pmemories.data.TripEntity
@@ -203,6 +204,22 @@ class TravelViewModel(application: Application) : AndroidViewModel(application) 
                     dao.upsertTrip(TripEntity(id = tripId, title = resolvedTitle))
                 }
                 dao.replaceStops(tripId, entities)
+
+                // Ten sam event co iOS `persistTrip(_:)` (`TravelMapView.swift`)
+                // — jeden log per UNIKALNY tryb transportu użyty w tej podróży,
+                // plus `premiumFeatureTapped("multi_transport")` gdy podróż
+                // faktycznie łączy więcej niż jeden tryb (to jest granica
+                // Free/Premium na mapie podróży, taka sama po obu stronach).
+                val usedModes = stops.map { it.transport }.toSet()
+                usedModes.forEach { mode ->
+                    AnalyticsLogger.log(AnalyticsLogger.Event.TransportModeUsed(mode.rawValue))
+                }
+                if (usedModes.size > 1) {
+                    AnalyticsLogger.log(
+                        AnalyticsLogger.Event.PremiumFeatureTapped(feature = "multi_transport", source = "travel_map")
+                    )
+                }
+
                 draftStops.value = emptyList()
                 editingTripId.value = null
             } catch (e: Exception) {

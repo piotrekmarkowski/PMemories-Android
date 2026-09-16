@@ -6,6 +6,7 @@ import android.net.Uri
 import android.provider.MediaStore
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.piotrmarkowski.pmemories.analytics.AnalyticsLogger
 import com.piotrmarkowski.pmemories.data.AppDatabase
 import com.piotrmarkowski.pmemories.data.CaptionEntity
 import com.piotrmarkowski.pmemories.data.MediaItemEntity
@@ -303,6 +304,7 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
     fun startExport(outputFile: File) {
         val state = _uiState.value
         if (state.items.isEmpty()) return
+        AnalyticsLogger.log(AnalyticsLogger.Event.ExportStarted)
         _uiState.update { it.copy(exportState = ExportState.Exporting) }
         activeTransformer = StudioExporter.export(
             context = getApplication(),
@@ -318,6 +320,31 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
             outputFile = outputFile,
             onCompleted = {
                 viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                    // durationSeconds = długość WYEKSPORTOWANEGO WIDEO, nie czas
+                    // trwania samego eksportu — ta sama semantyka co iOS
+                    // (`composedProject.composition.duration.seconds`), bo cały
+                    // sens wspólnego kształtu zdarzeń to porównywalność między
+                    // platformami (patrz komentarz w `AnalyticsLogger.kt`).
+                    // `.use{}`/`AutoCloseable` na `MediaMetadataRetriever` istnieje
+                    // dopiero od API 29 — minSdk tego projektu to 26, więc jawny
+                    // `release()` w `finally`, nie `.use{}` (crash na starszych
+                    // telefonach: `NoSuchMethodError` na `close()`).
+                    val videoDurationSeconds = runCatching {
+                        val retriever = android.media.MediaMetadataRetriever()
+                        try {
+                            retriever.setDataSource(outputFile.absolutePath)
+                            val ms = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
+                            (ms?.toLongOrNull() ?: 0L) / 1000.0
+                        } finally {
+                            retriever.release()
+                        }
+                    }.getOrDefault(0.0)
+                    AnalyticsLogger.log(
+                        AnalyticsLogger.Event.ExportCompleted(
+                            durationSeconds = videoDurationSeconds,
+                            usedColorFilter = state.colorStyle != ColorStyle.NONE
+                        )
+                    )
                     val galleryUri = runCatching { GallerySaver.saveVideo(getApplication(), outputFile) }.getOrNull()
                     _uiState.update {
                         it.copy(exportState = ExportState.Done(outputFile.absolutePath, galleryUri))

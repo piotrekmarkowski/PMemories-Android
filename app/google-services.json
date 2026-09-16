@@ -1,31 +1,44 @@
 {
   "project_info": {
-    "project_number": "000000000000",
-    "project_id": "pmemories-placeholder",
-    "storage_bucket": "pmemories-placeholder.appspot.com"
+    "project_number": "660887042608",
+    "project_id": "pmemories",
+    "storage_bucket": "pmemories.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:000000000000:android:0000000000000000000000",
+        "mobilesdk_app_id": "1:660887042608:android:c2e1822f17342bd6e80bf5",
         "android_client_info": {
           "package_name": "com.piotrmarkowski.pmemories"
         }
       },
       "oauth_client": [
         {
-          "client_id": "000000000000-placeholder.apps.googleusercontent.com",
+          "client_id": "660887042608-vf51mtr74veu881s7e9r3kv90s5a2obu.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.piotrmarkowski.pmemories",
+            "certificate_hash": "542d9792199d3be15f75f1ba4c8132a5e90a0a13"
+          }
+        },
+        {
+          "client_id": "660887042608-hikji382f365ct88d66maka95nupb88u.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "PLACEHOLDER_REPLACE_WITH_REAL_google-services.json"
+          "current_key": "AIzaSyDDRDVKYCq4Ym3NFzRIQ7vChJX2CgvcvAk"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "660887042608-hikji382f365ct88d66maka95nupb88u.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

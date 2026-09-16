@@ -82,6 +82,7 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
+    implementation(libs.firebase.analytics)
     // Credential Manager — nowoczesny, zalecany sposób logowania Google na
     // Androidzie (zastąpił starsze, wycofywane `GoogleSignInClient`/
     // `GoogleSignInApi`), spójne z resztą projektu: zawsze najnowsze,

@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
+import com.piotrmarkowski.pmemories.analytics.AnalyticsLogger
 import com.piotrmarkowski.pmemories.studio.TempFileCleanup
 
 /**
@@ -18,6 +19,7 @@ import com.piotrmarkowski.pmemories.studio.TempFileCleanup
 class PMemoriesApplication : Application() {
     override fun onCreate() {
         super.onCreate()
+        AnalyticsLogger.log(AnalyticsLogger.Event.AppOpened)
         TempFileCleanup.purgeStaleFiles(this)
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStop(owner: LifecycleOwner) {

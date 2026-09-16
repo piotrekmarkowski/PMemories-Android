@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.piotrmarkowski.pmemories.analytics.AnalyticsLogger
 import com.piotrmarkowski.pmemories.leaderboard.LeaderboardEntry
 import com.piotrmarkowski.pmemories.leaderboard.LeaderboardService
 import com.piotrmarkowski.pmemories.travel.TravelAchievementsCalculator
@@ -40,6 +41,10 @@ fun LeaderboardScreen(onBack: () -> Unit, viewModel: TravelViewModel = viewModel
     var entries by remember { mutableStateOf<List<LeaderboardEntry>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        AnalyticsLogger.log(AnalyticsLogger.Event.LeaderboardOpened)
+    }
 
     LaunchedEffect(state.trips) {
         isLoading = true
