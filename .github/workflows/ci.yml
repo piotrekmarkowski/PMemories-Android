@@ -18,10 +18,13 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  # 11:00 UTC = 12:00 UK latem (BST) — ten sam offset co iOS, ta sama
-  # przyszła korekta ręczna po przejściu na czas zimowy (GMT).
+  # 16.09.2026 — POPRAWKA: było policzone pod UK (BST=UTC+1), nie pod usera
+  # (Polska, CEST=UTC+2) — patrz identyczna poprawka i wyjaśnienie w
+  # PMemories-iOS `ci.yml`. `0 10 * * *` UTC = 12:00 w Polsce teraz (CEST).
+  # Ręcznie poprawić na `0 11 * * *`, gdy Polska przejdzie na czas zimowy
+  # (CET) pod koniec października.
   schedule:
-    - cron: '0 11 * * *'
+    - cron: '0 10 * * *'
   workflow_dispatch:
 
 jobs:
@@ -118,10 +121,17 @@ jobs:
           # mówi mu który `auto-fix.yml` odpalić (`PMemories-iOS` vs
           # `PMemories-Android`).
           KEYBOARD="{\"inline_keyboard\":[[{\"text\":\"${BUTTON_TEXT}\",\"callback_data\":\"fix:android:${{ github.run_id }}\"}]]}"
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+          # 16.09.2026 — patrz ten sam fix w PMemories-iOS `ci.yml`: łapiemy
+          # odpowiedź Telegrama i sprawdzamy "ok":true zamiast ją wyrzucać —
+          # cicha awaria wysyłki nie może dawać zielonego stepa.
+          TG_RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             --data-urlencode "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
             --data-urlencode "text=${MESSAGE}" \
-            --data-urlencode "reply_markup=${KEYBOARD}" > /dev/null
+            --data-urlencode "reply_markup=${KEYBOARD}")
+          if ! echo "$TG_RESPONSE" | grep -q '"ok":true'; then
+            echo "::error::Telegram sendMessage nie powiodło się: $TG_RESPONSE"
+            exit 1
+          fi
 
       - name: Notify Telegram on success
         if: success()
@@ -136,6 +146,10 @@ jobs:
           else
             MESSAGE=$(printf '✅ PMemories Android CI passed\nGałąź: %s\nCommit: %s' "$BRANCH" "$COMMIT_MSG")
           fi
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+          TG_RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             --data-urlencode "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
-            --data-urlencode "text=${MESSAGE}" > /dev/null
+            --data-urlencode "text=${MESSAGE}")
+          if ! echo "$TG_RESPONSE" | grep -q '"ok":true'; then
+            echo "::error::Telegram sendMessage nie powiodło się: $TG_RESPONSE"
+            exit 1
+          fi
