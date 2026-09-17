@@ -23,6 +23,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -109,6 +111,34 @@ private fun PassportStampCard(country: PassportCountry) {
     }
     val dateText = remember(country.firstVisitMillis) {
         country.firstVisitMillis?.let { SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(Date(it)) } ?: ""
+    }
+
+    // 17.09.2026 — prawdziwa naklejka gdy mamy plik (dziś: 45 krajów
+    // Europy), inaczej flaga+tekst niżej. Android buduje
+    // worldStickerAssetByCountryCode WYŁĄCZNIE z realnie istniejących
+    // plików (nie ma 300-wpisowego słownika z dziurami jak iOS miał) —
+    // więc tu wystarczy zwykłe sprawdzenie obecności klucza, bez
+    // dodatkowej weryfikacji istnienia zasobu (patrz komentarz w pliku).
+    val stickerDrawable = com.piotrmarkowski.pmemories.travel.worldStickerAssetByCountryCode[country.countryCode]
+    if (stickerDrawable != null) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .fillMaxWidth()
+                .rotate(rotationDegrees.toFloat())
+                .padding(6.dp)
+        ) {
+            androidx.compose.foundation.Image(
+                painter = painterResource(id = stickerDrawable),
+                contentDescription = country.countryName,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxWidth()
+            )
+            if (dateText.isNotEmpty()) {
+                Text(dateText, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF2F6FED))
+            }
+        }
+        return
     }
 
     Box(
