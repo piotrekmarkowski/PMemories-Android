@@ -4,8 +4,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -52,6 +54,7 @@ fun TravelScreen(
     onOpenTrip: (String) -> Unit,
     onNewTrip: () -> Unit,
     onOpenRanking: () -> Unit,
+    onOpenPoster: () -> Unit,
     viewModel: TravelViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -82,6 +85,14 @@ fun TravelScreen(
 
             val score = remember(state.trips) { TravelAchievementsCalculator.explorerScore(state.trips) }
             ExplorerScoreCard(score = score, onClick = onOpenRanking)
+
+            if (state.trips.isNotEmpty()) {
+                androidx.compose.material3.OutlinedButton(
+                    onClick = onOpenPoster,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                ) { Text("My Travel Journey Poster") }
+                Spacer(Modifier.height(8.dp))
+            }
 
             when (segment) {
                 TravelSegment.TRIPS -> TripsList(

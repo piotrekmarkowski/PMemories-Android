@@ -13,7 +13,9 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.piotrmarkowski.pmemories.R
@@ -28,7 +30,9 @@ import androidx.navigation.NavType
 import com.piotrmarkowski.pmemories.ui.home.DashboardScreen
 import com.piotrmarkowski.pmemories.ui.library.LibraryScreen
 import com.piotrmarkowski.pmemories.ui.studio.StudioScreen
+import com.piotrmarkowski.pmemories.travel.TravelViewModel
 import com.piotrmarkowski.pmemories.ui.travel.LeaderboardScreen
+import com.piotrmarkowski.pmemories.ui.travel.TravelPosterScreen
 import com.piotrmarkowski.pmemories.ui.travel.TravelScreen
 import com.piotrmarkowski.pmemories.ui.travel.TripBuilderScreen
 import com.piotrmarkowski.pmemories.ui.travel.TripDetailScreen
@@ -89,8 +93,14 @@ fun PMemoriesNavHost() {
                 TravelScreen(
                     onOpenTrip = { tripId -> navController.navigate("travel/trip/$tripId") },
                     onNewTrip = { navController.navigate("travel/builder") },
-                    onOpenRanking = { navController.navigate("travel/ranking") }
+                    onOpenRanking = { navController.navigate("travel/ranking") },
+                    onOpenPoster = { navController.navigate("travel/poster") }
                 )
+            }
+            composable("travel/poster") {
+                val posterViewModel: TravelViewModel = viewModel()
+                val posterState by posterViewModel.uiState.collectAsState()
+                TravelPosterScreen(trips = posterState.trips, onBack = { navController.popBackStack() })
             }
             composable("travel/builder") {
                 TripBuilderScreen(onDone = { navController.popBackStack() })
