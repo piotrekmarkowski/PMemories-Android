@@ -23,9 +23,14 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -62,6 +67,14 @@ fun TravelPosterScreen(trips: List<TripWithStops>, onBack: () -> Unit) {
         .distinctBy { it.countryCode ?: it.country }
         .filter { it.countryCode != null }
 
+    // Etap 2 (17.09.2026) — prawdziwa mapa, Android odpowiednik iOS
+    // `MKMapSnapshotter`: żywa `GoogleMap` renderuje się RAZ, poza-ekranowo
+    // w duchu (kontrolki/gesty wyłączone), robi zrzut bitmapowy, a POTEM
+    // pokazujemy TYLKO ten statyczny obraz — nie żywą interaktywną mapę w
+    // scrollowalnym, udostępnialnym plakacie.
+    var mapSnapshot by remember(trips) { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var mapSnapshotRequested by remember(trips) { mutableStateOf(false) }
+
     Scaffold(
         topBar = { TopAppBar(title = { Text("My Travel Journey") }) }
     ) { padding ->
@@ -69,7 +82,7 @@ fun TravelPosterScreen(trips: List<TripWithStops>, onBack: () -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(Color(0xFFF4EFE3)) // ciepły kremowy papier — tymczasowe tło zanim dojdzie prawdziwa tekstura (Etap 2)
+                .background(Color(0xFFF4EFE3)) // ciepły kremowy papier — tymczasowe tło zanim dojdzie prawdziwa tekstura (Etap 3)
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
@@ -81,8 +94,76 @@ fun TravelPosterScreen(trips: List<TripWithStops>, onBack: () -> Unit) {
                 modifier = Modifier.fillMaxWidth()
             )
 
+            PosterMapSection(
+                trips = trips,
+                snapshot = mapSnapshot,
+                onNeedSnapshot = { mapSnapshotRequested = true },
+                requested = mapSnapshotRequested,
+                onSnapshotReady = { mapSnapshot = it }
+            )
+
             JourneyStatsPlaque(stats)
             JourneyStampsRow(countryCodes = countries.mapNotNull { it.countryCode })
+        }
+    }
+}
+
+/** Pokazuje `PosterMapSnapshot` (żywa mapa, poza oczami, jednorazowo) DOPÓKI
+ * nie mamy bitmapy, potem podmienia na statyczny `Image` — użytkownik widzi
+ * krótkie miejsce na ładowanie, nigdy żywej interaktywnej mapy w plakacie. */
+@Composable
+private fun PosterMapSection(
+    trips: List<TripWithStops>,
+    snapshot: android.graphics.Bitmap?,
+    requested: Boolean,
+    onNeedSnapshot: () -> Unit,
+    onSnapshotReady: (android.graphics.Bitmap?) -> Unit,
+) {
+    val hasStops = trips.any { it.stops.isNotEmpty() }
+    if (!hasStops) return
+
+    // 17.09.2026 — zabezpieczenie po realnym znalezisku na żywo: gdy klucz
+    // Google Maps odmówi autoryzacji (albo po prostu brak sieci), mapa NIGDY
+    // nie woła `onMapLoaded`/`snapshot()`, więc bez tego appka wisiałaby na
+    // "Loading map…" w nieskończoność. Po 8s bez wyniku pokazujemy czytelny
+    // komunikat zamiast martwego stanu ładowania.
+    var timedOut by remember(trips) { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        onNeedSnapshot()
+        kotlinx.coroutines.delay(8000)
+        timedOut = true
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(220.dp)
+            .background(Color(0xFFE7DFC9), RoundedCornerShape(12.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        if (snapshot != null) {
+            Image(
+                bitmap = snapshot.asImageBitmap(),
+                contentDescription = "Map of visited places",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        } else if (timedOut) {
+            Text(
+                "Map unavailable right now",
+                color = Color(0xFF29241C).copy(alpha = 0.6f),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+        } else {
+            if (requested) {
+                // Żywa mapa renderuje się raz, w normalnym miejscu layoutu
+                // (musi mieć realny rozmiar żeby `snapshot()` cokolwiek
+                // złapał) — znika automatycznie gdy `onSnapshotReady`
+                // dostarczy bitmapę (rekompozycja z `snapshot != null`).
+                PosterMapSnapshot(trips = trips, widthDp = 340, heightDp = 220, onSnapshot = onSnapshotReady)
+            }
+            Text("Loading map…", color = Color(0xFF29241C).copy(alpha = 0.5f))
         }
     }
 }
