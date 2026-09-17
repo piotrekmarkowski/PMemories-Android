@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.piotrmarkowski.pmemories.data.TripWithStops
 import com.piotrmarkowski.pmemories.travel.JourneyStats
+import com.piotrmarkowski.pmemories.travel.flagEmoji
 import com.piotrmarkowski.pmemories.travel.journeyStampAssetByCountryCode
 
 /**
@@ -195,14 +196,4 @@ private fun MoreStampsCard(count: Int) {
         Text("+$count", fontSize = 20.sp, fontWeight = FontWeight.Black, color = Color(0xFF29241C).copy(alpha = 0.75f))
         Text("MORE", fontSize = 9.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF29241C).copy(alpha = 0.75f))
     }
-}
-
-/** Kod ISO (2 litery) -> flaga emoji, przez znaki wskaźnika regionalnego
- * Unicode (standardowa sztuczka, ten sam wynik co iOS `flagEmoji`). Kody
- * inne niż 2 litery (np. syntetyczne "GB-ENG") dostają bezpieczne 🌍. */
-private fun flagEmoji(countryCode: String): String {
-    if (countryCode.length != 2) return "🌍"
-    val base = 0x1F1E6 - 'A'.code
-    return countryCode.uppercase().map { base + it.code }
-        .joinToString("") { String(Character.toChars(it)) }
 }

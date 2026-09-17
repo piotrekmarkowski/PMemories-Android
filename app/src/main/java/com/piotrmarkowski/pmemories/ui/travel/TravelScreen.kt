@@ -55,6 +55,7 @@ fun TravelScreen(
     onNewTrip: () -> Unit,
     onOpenRanking: () -> Unit,
     onOpenPoster: () -> Unit,
+    onOpenPassport: () -> Unit,
     viewModel: TravelViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -91,6 +92,11 @@ fun TravelScreen(
                     onClick = onOpenPoster,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
                 ) { Text("My Travel Journey Poster") }
+                Spacer(Modifier.height(8.dp))
+                androidx.compose.material3.OutlinedButton(
+                    onClick = onOpenPassport,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                ) { Text("Travel Passport") }
                 Spacer(Modifier.height(8.dp))
             }
 

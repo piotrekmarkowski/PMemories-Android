@@ -100,4 +100,46 @@ object TravelAchievementsCalculator {
             ?: return null
         return peakStop.cityName to Math.round(peakStop.highestElevationMeters ?: 0.0).toInt()
     }
+
+    /** Display name for the 4 synthetic UK region codes — mirrors iOS
+     * `ukPassportRegion`, which has to hardcode these too (no ISO code for
+     * constituent UK nations, so the normal country-name lookup can't
+     * resolve them). */
+    private fun ukRegionDisplayName(code: String): String? = when (code) {
+        "GB-ENG" -> "England"
+        "GB-SCT" -> "Scotland"
+        "GB-WLS" -> "Wales"
+        "GB-NIR" -> "Northern Ireland"
+        else -> null
+    }
+
+    /** One entry per visited country (UK split into 4, see `countryGroupingCode`)
+     * — port 1:1 of iOS `passportCountries(from:)`. Sorted chronologically by
+     * first visit, oldest stamp first (like a real passport), earliest stop
+     * without a date sinks to the end rather than crashing a sort on `null`. */
+    fun passportCountries(trips: List<TripWithStops>): List<PassportCountry> {
+        data class Acc(var name: String, var firstVisit: Long?)
+        val byCode = LinkedHashMap<String, Acc>()
+        for (stop in trips.flatMap { it.stops }) {
+            val rawCode = stop.countryCode ?: continue
+            val code = countryGroupingCode(rawCode, stop.administrativeArea) ?: continue
+            val displayName = ukRegionDisplayName(code) ?: stop.country ?: byCode[code]?.name ?: code
+            val existing = byCode[code]
+            val earliest = when {
+                existing?.firstVisit == null -> stop.arrivalDate
+                stop.arrivalDate == null -> existing.firstVisit
+                else -> minOf(existing.firstVisit!!, stop.arrivalDate)
+            }
+            byCode[code] = Acc(displayName, earliest)
+        }
+        return byCode.entries
+            .map { (code, acc) -> PassportCountry(countryCode = code, countryName = acc.name, firstVisitMillis = acc.firstVisit) }
+            .sortedWith(compareBy(nullsLast()) { it.firstVisitMillis })
+    }
 }
+
+data class PassportCountry(
+    val countryCode: String,
+    val countryName: String,
+    val firstVisitMillis: Long?,
+)

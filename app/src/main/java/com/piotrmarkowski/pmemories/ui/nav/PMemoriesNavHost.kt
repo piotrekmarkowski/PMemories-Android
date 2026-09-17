@@ -32,6 +32,7 @@ import com.piotrmarkowski.pmemories.ui.library.LibraryScreen
 import com.piotrmarkowski.pmemories.ui.studio.StudioScreen
 import com.piotrmarkowski.pmemories.travel.TravelViewModel
 import com.piotrmarkowski.pmemories.ui.travel.LeaderboardScreen
+import com.piotrmarkowski.pmemories.ui.travel.TravelPassportScreen
 import com.piotrmarkowski.pmemories.ui.travel.TravelPosterScreen
 import com.piotrmarkowski.pmemories.ui.travel.TravelScreen
 import com.piotrmarkowski.pmemories.ui.travel.TripBuilderScreen
@@ -94,13 +95,19 @@ fun PMemoriesNavHost() {
                     onOpenTrip = { tripId -> navController.navigate("travel/trip/$tripId") },
                     onNewTrip = { navController.navigate("travel/builder") },
                     onOpenRanking = { navController.navigate("travel/ranking") },
-                    onOpenPoster = { navController.navigate("travel/poster") }
+                    onOpenPoster = { navController.navigate("travel/poster") },
+                    onOpenPassport = { navController.navigate("travel/passport") }
                 )
             }
             composable("travel/poster") {
                 val posterViewModel: TravelViewModel = viewModel()
                 val posterState by posterViewModel.uiState.collectAsState()
                 TravelPosterScreen(trips = posterState.trips, onBack = { navController.popBackStack() })
+            }
+            composable("travel/passport") {
+                val passportViewModel: TravelViewModel = viewModel()
+                val passportState by passportViewModel.uiState.collectAsState()
+                TravelPassportScreen(trips = passportState.trips, onBack = { navController.popBackStack() })
             }
             composable("travel/builder") {
                 TripBuilderScreen(onDone = { navController.popBackStack() })
