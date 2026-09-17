@@ -12,12 +12,17 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items as lazyRowItems
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.shadow
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -39,7 +44,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.piotrmarkowski.pmemories.data.TripWithStops
 import com.piotrmarkowski.pmemories.travel.JourneyStats
+import com.piotrmarkowski.pmemories.travel.TravelAchievementsCalculator
 import com.piotrmarkowski.pmemories.travel.flagEmoji
+import com.piotrmarkowski.pmemories.travel.loadPolaroids
 import com.piotrmarkowski.pmemories.travel.journeyStampAssetByCountryCode
 
 /**
@@ -103,6 +110,12 @@ fun TravelPosterScreen(trips: List<TripWithStops>, onBack: () -> Unit) {
             )
 
             JourneyStatsPlaque(stats)
+
+            val polaroids = remember(trips) { TravelAchievementsCalculator.loadPolaroids(trips) }
+            if (polaroids.isNotEmpty()) {
+                PolaroidRow(polaroids)
+            }
+
             JourneyStampsRow(countryCodes = countries.mapNotNull { it.countryCode })
         }
     }
@@ -165,6 +178,74 @@ private fun PosterMapSection(
             }
             Text("Loading map…", color = Color(0xFF29241C).copy(alpha = 0.5f))
         }
+    }
+}
+
+/**
+ * Etap 3 (17.09.2026) — prawdziwe zdjęcia z podróży, port DUCHA iOS
+ * `PolaroidView` (białe karty, taśma washi, kursywa podpisu, lekki obrót),
+ * NIE dosłownych pikselowych współrzędnych — te na iOS przeszły 11+ rund
+ * ręcznego strojenia pod DOKŁADNIE jego układ absolutnego canvasu
+ * nałożonego na mapę (`layouts` w `loadPolaroids()`), coś co nie ma sensu
+ * kopiować 1:1 do liniowego układu Compose. Tu: pozioma przewijana lista,
+ * ten sam charakter (obrót/taśma/cień/podpis kursywą), inny kontener.
+ */
+@Composable
+private fun PolaroidRow(polaroids: List<com.piotrmarkowski.pmemories.travel.PolaroidPhoto>) {
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(18.dp),
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 12.dp)
+    ) {
+        // `items` jest już zaimportowane dla LazyVerticalGrid (siatka
+        // pieczątek) — alias `lazyRowItems` tu, żeby nie kolidowało z
+        // przeciążeniem dla LazyGridScope.
+        lazyRowItems(polaroids) { photo -> PolaroidCard(photo) }
+    }
+}
+
+@Composable
+private fun PolaroidCard(photo: com.piotrmarkowski.pmemories.travel.PolaroidPhoto) {
+    val jitter = remember(photo.uri) {
+        val seed = kotlin.math.abs(photo.uri.hashCode())
+        val angle = -8f + (seed % 17)
+        val tapeWidth = 64f + (seed / 17 % 13)
+        val tapeOffsetX = -6f + (seed / 221 % 13)
+        Triple(angle, tapeWidth, tapeOffsetX)
+    }
+    Box(
+        contentAlignment = Alignment.TopCenter,
+        modifier = Modifier
+            .rotate(jitter.first)
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .shadow(6.dp, RoundedCornerShape(2.dp))
+                .background(Color.White)
+                .padding(10.dp)
+        ) {
+            coil.compose.AsyncImage(
+                model = android.net.Uri.parse(photo.uri),
+                contentDescription = photo.caption,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.width(150.dp).height(150.dp)
+            )
+            Text(
+                photo.caption,
+                fontSize = 13.sp,
+                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                color = Color.Black.copy(alpha = 0.75f),
+                maxLines = 1,
+                modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
+            )
+        }
+        androidx.compose.foundation.Image(
+            painter = painterResource(id = com.piotrmarkowski.pmemories.R.drawable.travel_journey_tape),
+            contentDescription = null,
+            modifier = Modifier
+                .width(jitter.second.dp)
+                .offset(x = jitter.third.dp, y = (-12).dp)
+        )
     }
 }
 

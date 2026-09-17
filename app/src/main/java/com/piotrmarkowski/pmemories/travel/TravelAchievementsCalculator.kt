@@ -143,3 +143,40 @@ data class PassportCountry(
     val countryName: String,
     val firstVisitMillis: Long?,
 )
+
+/** One representative photo per country for the Poster's polaroid row —
+ * port of iOS `loadPolaroids()` selection logic (real destinations
+ * preferred over airport/transit stops, most recent trips first, one per
+ * country, capped at 5). Android skips the async PHAsset lookup entirely —
+ * `representativePhotoUri` is already a directly-loadable content URI. */
+data class PolaroidPhoto(val uri: String, val caption: String, val countryCode: String)
+
+private val knownAirportOnlyNames = setOf(
+    "gatwick", "heathrow", "luton", "stansted", "southend", "schiphol",
+    "orly", "fiumicino", "changi", "narita", "haneda",
+)
+
+private fun looksLikeAirport(cityName: String): Boolean {
+    val lower = cityName.lowercase(Locale.ROOT)
+    if (lower.contains("airport") || lower.contains("lotnisko")) return true
+    val firstToken = lower.substringBefore(",").trim()
+    return knownAirportOnlyNames.contains(firstToken)
+}
+
+fun TravelAchievementsCalculator.loadPolaroids(trips: List<TripWithStops>, limit: Int = 5): List<PolaroidPhoto> {
+    val seenCountries = mutableSetOf<String>()
+    val results = mutableListOf<PolaroidPhoto>()
+    for (trip in trips.sortedByDescending { it.trip.createdAt }) {
+        val withPhoto = trip.orderedStops.filter { !it.representativePhotoUri.isNullOrBlank() }
+        val realDestinations = withPhoto.filterNot { looksLikeAirport(it.cityName) }
+        val pool = realDestinations.ifEmpty { withPhoto }
+        for (stop in pool) {
+            val code = countryGroupingCode(stop.countryCode, stop.administrativeArea) ?: stop.cityName
+            if (!seenCountries.add(code)) continue
+            results += PolaroidPhoto(uri = stop.representativePhotoUri!!, caption = stop.cityName, countryCode = code)
+            if (results.size >= limit) return results
+        }
+        if (results.size >= limit) return results
+    }
+    return results
+}

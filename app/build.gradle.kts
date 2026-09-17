@@ -93,6 +93,7 @@ dependencies {
 
     // Etap 7 — Travel Map.
     implementation(libs.androidx.exifinterface)
+    implementation(libs.coil.compose)
     implementation(libs.maps.compose)
     implementation(libs.play.services.maps)
 }
